@@ -7,6 +7,10 @@
     img {
       width: 40px;
     }
+    td {
+      width: 50px;
+      text-align: center;
+    }
     </style>
     <script defer src="/__/firebase/5.8.3/firebase-app.js"></script>
     <script defer src="/__/firebase/5.8.3/firebase-auth.js"></script>
@@ -123,7 +127,10 @@
       ]);
     }
     function viewHand(hand, hide_tiles) {
-      return m('ol', hand.map(item => m('li', viewHandItem(item, hide_tiles))));
+      return m('table', [
+        m('tr', hand.map((item, idx) => m('td', idx))),
+        m('tr', hand.map(item => m('td', viewHandItem(item, hide_tiles)))),
+      ]);
     }
     function viewHandItem(item, hide_tiles) {
       return item.tile
@@ -131,8 +138,9 @@
         : viewHint(item.hint);
     }
     function viewTile(tile, hide_tiles) {
-      return m('p', [
+      return m('div', [
         m('img', { src: `./imgs/tiles/${hide_tiles ? "uu" : tile.tile.toLowerCase()}.svg` }),
+        m('br'),
         `[${tile.hints}]`
       ]);
     }
@@ -215,11 +223,11 @@
           });
           return log("game has begun!");
         }
-        function discardTile(tile_idx) {
+        function discardTile(idx_str) {
           if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
             return log("not your turn");
           }
-          const idx = Number(tile_idx) - 1;
+          const idx = Number(idx_str);
           const hand = model.room.hands[model.uid];
           if (!hand[idx] || !hand[idx].tile) {
             return log(`can't discard that, try again`);
@@ -239,11 +247,11 @@
           remote.room.update(update);
           return log(`discarding ${hand[idx].tile}`);
         }
-        function playTile(tile_idx) {
+        function playTile(idx_str) {
           if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
             return log("not your turn");
           }
-          const idx = Number(tile_idx) - 1;
+          const idx = Number(idx_str);
           const hand = model.room.hands[model.uid];
           if (!hand[idx] || !hand[idx].tile) {
             return log(`can't play that, try again`);
