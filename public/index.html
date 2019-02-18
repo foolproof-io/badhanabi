@@ -259,16 +259,22 @@
           remote.room.update(update);
           return log(`playing ${hand[idx].tile}`);
         }
-        function giveHint(target_player, hint) {
+        function giveHint(target_prefix, hint) {
           if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
             return log("not your turn");
           }
           if (model.hints === 0) {
             return log("no hints left");
           }
-          if (target_player === model.uid) {
-            return log("cannot hint yourself");
+          const matching_players = model.room.players
+                                .filter(p => p !== model.uid && p.startsWith(target_prefix));
+          if (matching_players.length === 0) {
+            return log("prefix doesn't match any of the others players");
           }
+          if (matching_players.length > 1) {
+            return log(`prefix matches ${matching_players.length} players`);
+          }
+          const target_player = matching_players[0];
           if (model.room.players.indexOf(target_player) === -1) {
             return log("no such player");
           }
