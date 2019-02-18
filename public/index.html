@@ -180,7 +180,7 @@
           if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
             return log("it's not your turn right now");
           }
-          return log("[UNREACHABLE] this shit is busted, my bad");
+          return log("you can /discard <tile_idx>, /play <tile_idx>, or /hint <player> <hint>");
         }
         function startGame() {
           if (model.room.state) {
@@ -278,7 +278,8 @@
           if (model.room.players.indexOf(target_player) === -1) {
             return log("no such player");
           }
-          if (COLORS.indexOf(hint) === -1 && RANKS.indexOf(hint) === -1) {
+          let hint = hint.toUpperCase();
+          if (hint.length !== 1 || COLORS.indexOf(hint) === -1 && RANKS.indexOf(hint) === -1) {
             return log("invalid hint");
           }
           let update = {};
