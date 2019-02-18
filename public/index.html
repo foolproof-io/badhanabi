@@ -51,6 +51,16 @@
       return players[(idx + 1) % players.length];
     }
 
+    function isLegalPlay(played, tile) {
+      const color = tile[0];
+      let highest_of_color = 0;
+      played.forEach(p => {
+        if (p[0] == color && Number(p[1]) > highest_of_color) {
+          highest_of_color = Number(p[1]);
+        }
+      });
+      return Number(tile[1]) === highest_of_color + 1;
+    }
     function applyHintToHand(hand, hint) {
       let applied = hand.map(item => {
         if (item.tile && matchesHint(item.tile, hint)) {
@@ -60,6 +70,10 @@
       });
       applied.push({ hint });
       return applied;
+    }
+
+    function applyDiscardToHand(hand, idx) {
+      return hand.slice(0, idx).concat(hand.slice(idx+1));
     }
 
     function matchesHint(tile, hint) {
@@ -75,6 +89,9 @@
         m('div', { id: "whoami", }, `You are: ${model.uid}`),
         m('div', { id: "state", }, model.room.state || "waiting to start"),
         m('div', { id: "hints", }, `Hints: ${model.room.hints}`),
+        m('div', { id: "errors", }, `Errors: ${model.room.errors}`),
+        m('div', { id: "discards", }, `Discards: ${model.room.discard_pile}`),
+        m('div', { id: "plays", }, `Plays: ${model.room.play_pile}`),
 
         m('div', {
           id: "players",
@@ -97,7 +114,7 @@
 
         m('div', {
           id: "messages",
-        }, model.messages.map(msg => m('p', msg))),
+        }, model.messages.map(msg => m('p', msg)).reverse()),
       ]);
     }
     function viewHand(hand, hide_tiles) {
@@ -182,6 +199,7 @@
           remote.room.update({
             draw_pile: deck,
             discard_pile: [],
+            play_pile: [],
             hints: NUM_INITIAL_HINTS,
             errors: 0,
             hands,
@@ -189,12 +207,67 @@
           });
           return log("game has begun!");
         }
+        function discardTile(tile_idx) {
+          if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
+            return log("not your turn");
+          }
+          const idx = Number(tile_idx) - 1;
+          const hand = model.room.hands[model.uid];
+          if (!hand[idx] || !hand[idx].tile) {
+            return log(`can't discard that, try again`);
+          }
+          let update = {};
+          update.state = ROOM_STATES.WAITING_FOR_PLAYER(playerAfter(model.room.players, model.uid));
+          update.hints = model.room.hints + 1;
+          update.discard_pile = model.room.discard_pile.concat(hand[idx].tile);
+          const next_tile = model.room.draw_pile[0];
+          if (next_tile) {
+            update.draw_pile = model.room.draw_pile.slice(1);
+            update[`hands.${model.uid}`] = applyDiscardToHand(hand, idx).concat({
+              tile: next_tile,
+              hints: [],
+            });
+          }
+          remote.room.update(update);
+          return log(`discarding ${hand[idx].tile}`);
+        }
+        function playTile(tile_idx) {
+          if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
+            return log("not your turn");
+          }
+          const idx = Number(tile_idx) - 1;
+          const hand = model.room.hands[model.uid];
+          if (!hand[idx] || !hand[idx].tile) {
+            return log(`can't play that, try again`);
+          }
+          let update = {};
+          update.state = ROOM_STATES.WAITING_FOR_PLAYER(playerAfter(model.room.players, model.uid));
+          if (isLegalPlay(model.room.play_pile, hand[idx].tile)) {
+            update.play_pile = model.room.play_pile.concat(hand[idx].tile);
+          } else {
+            update.errors = model.room.errors + 1;
+            update.discard_pile = model.room.discard_pile.concat(hand[idx].tile);
+          }
+          const next_tile = model.room.draw_pile[0];
+          if (next_tile) {
+            update.draw_pile = model.room.draw_pile.slice(1);
+            update[`hands.${model.uid}`] = applyDiscardToHand(hand, idx).concat({
+              tile: next_tile,
+              hints: [],
+            });
+          }
+          remote.room.update(update);
+          return log(`playing ${hand[idx].tile}`);
+        }
         function giveHint(target_player, hint) {
           if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
             return log("not your turn");
           }
           if (model.hints === 0) {
             return log("no hints left");
+          }
+          if (target_player === model.uid) {
+            return log("cannot hint yourself");
           }
           if (model.room.players.indexOf(target_player) === -1) {
             return log("no such player");
@@ -213,6 +286,8 @@
           help: help,
           start: startGame,
           hint: giveHint,
+          discard: discardTile,
+          play: playTile,
         };
         function perform(action) {
           if (!model.uid) {
