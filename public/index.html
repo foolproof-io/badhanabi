@@ -11,6 +11,7 @@
     <script defer src="https://unpkg.com/lodash/lodash.js"></script>
     <script>
     const COLORS = ['R', 'G', 'B', 'Y', 'W', 'P'];
+    const RANKS = ['1', '2', '3', '4', '5'];
     function generateDeck() {
       let tiles = [];
       COLORS.forEach(c => {
@@ -36,32 +37,50 @@
         default: return -1;
       }
     }
+    const NUM_INITIAL_HINTS = 8;
     function drawTiles(tiles, num_tiles) {
       let ts = [];
       for (let i=0; i < num_tiles; i++) {
-        ts.push({ tile: tiles.pop() });
+        ts.push({ tile: tiles.pop(), hints: [] });
       }
       return ts;
     }
 
+    function playerAfter(players, p) {
+      const idx = players.indexOf(p);
+      return players[(idx + 1) % players.length];
+    }
+
+    function applyHintToHand(hand, hint) {
+      let applied = hand.map(item => {
+        if (item.tile && matchesHint(item.tile, hint)) {
+          item.hints.push(hint);
+        }
+        return item;
+      });
+      applied.push({ hint });
+      return applied;
+    }
+
+    function matchesHint(tile, hint) {
+      return tile.indexOf(hint) !== -1;
+    }
+
     const ROOM_STATES = {
       WAITING_TO_START: "waiting to start",
+      WAITING_FOR_PLAYER: player => `waiting for ${player}`,
     };
-    const EMPTY_ROOM = {
-      players: [],
-      state: ROOM_STATES.WAITING_TO_START,
-    };
-
     function viewModel(model, handler) {
       return m("main", [
         m('div', { id: "whoami", }, `You are: ${model.uid}`),
-        m('div', { id: "state", }, model.room.state),
+        m('div', { id: "state", }, model.room.state || "waiting to start"),
+        m('div', { id: "hints", }, `Hints: ${model.room.hints}`),
 
         m('div', {
           id: "players",
         }, [
           "Players:",
-          model.room.players.map(player => {
+          (model.room.players || []).map(player => {
             if (!model.room.hands) {
               return m('p', player);
             }
@@ -82,7 +101,7 @@
       ]);
     }
     function viewHand(hand, hide_tiles) {
-      return m('ol', hand.map(item => viewHandItem(item, hide_tiles)));
+      return m('ol', hand.map(item => m('li', viewHandItem(item, hide_tiles))));
     }
     function viewHandItem(item, hide_tiles) {
       return item.tile
@@ -90,9 +109,7 @@
         : viewHint(item.hint);
     }
     function viewTile(tile, hide_tiles) {
-      return hide_tiles
-        ? m('p', "HIDDEN")
-        : m('p', tile.tile);
+      return m('p', `${hide_tiles ? "HIDDEN" : tile.tile} [${tile.hints}]`);
     }
     function viewHint(hint) {
       return m('p', hint);
@@ -103,10 +120,7 @@
         const room_id = window.location.pathname.substring(1);
         let model = {
           messages: [],
-          room: {
-            players: [],
-            state: "initializing...",
-          },
+          room: {},
         };
         model.view = () => viewModel(model, handler);
 
@@ -119,9 +133,9 @@
         app.auth().onAuthStateChanged(evt => {
           model.uid = evt.uid;
           if (model.uid) {
-            app.firestore().collection("rooms").doc(room_id).update({
+            remote.room.set({
               players: firebase.firestore.FieldValue.arrayUnion(model.uid),
-            });
+            }, {merge:true});
           }
         });
         const remote = {
@@ -133,8 +147,6 @@
           if (snap.exists) {
             model.room = snap.data();
             m.redraw();
-          } else {
-            remote.room.set(EMPTY_ROOM);
           }
         });
 
@@ -145,19 +157,16 @@
           if (!model.room) {
             return log("waiting for room to load, this should happen automatically");
           }
-          if (model.room.players.indexOf(model.uid) === -1) {
-            return log("you're currently observing this game, try /join if you want to play");
-          }
-          if (model.room.state === ROOM_STATES.WAITING_TO_START) {
+          if (!model.room.state) {
             return log("this game hasn't started yet, try /start");
+          }
+          if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
+            return log("it's not your turn right now");
           }
           return log("[UNREACHABLE] this shit is busted, my bad");
         }
         function startGame() {
-          if (!model.room.state) {
-            return log("can't start until you've joined a room");
-          } 
-          if (model.room.state != ROOM_STATES.WAITING_TO_START) {
+          if (model.room.state) {
             return log(`game has already started`);
           }
 
@@ -173,14 +182,37 @@
           remote.room.update({
             draw_pile: deck,
             discard_pile: [],
+            hints: NUM_INITIAL_HINTS,
+            errors: 0,
             hands,
-            state: `waiting for ${model.room.players[0]}`
+            state: ROOM_STATES.WAITING_FOR_PLAYER(model.room.players[0]),
           });
           return log("game has begun!");
+        }
+        function giveHint(target_player, hint) {
+          if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
+            return log("not your turn");
+          }
+          if (model.hints === 0) {
+            return log("no hints left");
+          }
+          if (model.room.players.indexOf(target_player) === -1) {
+            return log("no such player");
+          }
+          if (COLORS.indexOf(hint) === -1 && RANKS.indexOf(hint) === -1) {
+            return log("invalid hint");
+          }
+          let update = {};
+          update.state = ROOM_STATES.WAITING_FOR_PLAYER(playerAfter(model.room.players, model.uid));
+          update.hints = model.room.hints - 1;
+          update[`hands.${target_player}`] = applyHintToHand(model.room.hands[target_player], hint);
+          remote.room.update(update);
+          return log(`telling ${target_player} about ${hint}`);
         }
         const commands = {
           help: help,
           start: startGame,
+          hint: giveHint,
         };
         function perform(action) {
           if (!model.uid) {
@@ -190,7 +222,8 @@
           for (cmd in commands) {
             if (action.startsWith(`/${cmd}`)) {
               const args = action.substring(cmd.length + 1).trim().split(/\s+/);
-              return commands[cmd].apply(null, args);
+              commands[cmd].apply(null, args);
+              return true;
             }
           }
           console.warn(`${action} does not match any of ${Object.keys(commands)}`);
