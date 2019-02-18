@@ -3,6 +3,11 @@
   <head>
     <meta charset="utf-8">
     <title>Bad Hanabi</title>
+    <style>
+    img {
+      width: 40px;
+    }
+    </style>
     <script defer src="/__/firebase/5.8.3/firebase-app.js"></script>
     <script defer src="/__/firebase/5.8.3/firebase-auth.js"></script>
     <script defer src="/__/firebase/5.8.3/firebase-firestore.js"></script>
@@ -126,7 +131,10 @@
         : viewHint(item.hint);
     }
     function viewTile(tile, hide_tiles) {
-      return m('p', `${hide_tiles ? "HIDDEN" : tile.tile} [${tile.hints}]`);
+      return m('p', [
+        m('img', { src: `./imgs/tiles/${hide_tiles ? "uu" : tile.tile.toLowerCase()}.svg` }),
+        `[${tile.hints}]`
+      ]);
     }
     function viewHint(hint) {
       return m('p', hint);
