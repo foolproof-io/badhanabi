@@ -25,8 +25,7 @@
         tiles.push(`${c}4`);
         tiles.push(`${c}5`);
       });
-      _.shuffle(tiles);
-      return tiles;
+      return _.shuffle(tiles);
     }
     function handSize(numPlayers) {
       switch (numPlayers) {
@@ -34,13 +33,13 @@
         case 3: return 5;
         case 4: return 4;
         case 5: return 4;
-        default: throw new Error("game only supports 2--5 players");
+        default: return -1;
       }
     }
     function drawTiles(tiles, num_tiles) {
       let ts = [];
       for (let i=0; i < num_tiles; i++) {
-        ts.push(tiles.pop());
+        ts.push({ tile: tiles.pop() });
       }
       return ts;
     }
@@ -48,110 +47,143 @@
     const ROOM_STATES = {
       WAITING_TO_START: "waiting to start",
     };
+    const EMPTY_ROOM = {
+      players: [],
+      state: ROOM_STATES.WAITING_TO_START,
+    };
+
+    function viewModel(model, handler) {
+      return m("main", [
+        m('div', { id: "whoami", }, `You are: ${model.uid}`),
+        m('div', { id: "state", }, model.room.state),
+
+        m('div', {
+          id: "players",
+        }, [
+          "Players:",
+          model.room.players.map(player => {
+            if (!model.room.hands) {
+              return m('p', player);
+            }
+            const hand = viewHand(model.room.hands[player], player === model.uid);
+            return m('p', [ player, hand ]);
+          })
+        ]),
+
+        m('input', {
+          id: "user_input",
+          onchange: handler,
+          placeholder: "user_input goes here",
+        }),
+
+        m('div', {
+          id: "messages",
+        }, model.messages.map(msg => m('p', msg))),
+      ]);
+    }
+    function viewHand(hand, hide_tiles) {
+      return m('ol', hand.map(item => viewHandItem(item, hide_tiles)));
+    }
+    function viewHandItem(item, hide_tiles) {
+      return item.tile
+        ? viewTile(item, hide_tiles)
+        : viewHint(item.hint);
+    }
+    function viewTile(tile, hide_tiles) {
+      return hide_tiles
+        ? m('p', "HIDDEN")
+        : m('p', tile.tile);
+    }
+    function viewHint(hint) {
+      return m('p', hint);
+    }
     </script>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        let state = {
+        const room_id = window.location.pathname.substring(1);
+        let model = {
           messages: [],
-          uid: null,
-          rooms: {},
-          current_room: null,
-          view: function() {
-            return m("main", [
-              m('div', {
-                id: "messages",
-              }, state.messages.map(msg => m('p', msg))),
-              m('input', {
-                id: "user_input",
-                onchange: onUserInput,
-                placeholder: "user_input goes here",
-              }),
-            ]);
-          }
+          room: {
+            players: [],
+            state: "initializing...",
+          },
         };
+        model.view = () => viewModel(model, handler);
+
         function log(msg) {
-          state.messages.push(msg);
+          model.messages.push(msg);
           return true;
         }
 
         const app = firebase.app();
         app.auth().onAuthStateChanged(evt => {
-          state.uid = evt.uid;
+          model.uid = evt.uid;
+          if (model.uid) {
+            app.firestore().collection("rooms").doc(room_id).update({
+              players: firebase.firestore.FieldValue.arrayUnion(model.uid),
+            });
+          }
         });
-        app.firestore().collection("rooms").onSnapshot(snap => {
-          console.log("rooms collection: ", snap);
-          snap.forEach(doc => {
-            state.rooms[doc.id] = doc.data();
-            console.log(`rooms[${doc.id}] = ${JSON.stringify(doc.data())}`);
-          });
+        const remote = {
+          room: app.firestore().collection("rooms").doc(room_id),
+          actions: app.firestore().collection("rooms").doc(room_id).collection("actions"),
+        };
+        remote.room.onSnapshot(snap => {
+          console.log("room: ", snap);
+          if (snap.exists) {
+            model.room = snap.data();
+            m.redraw();
+          } else {
+            remote.room.set(EMPTY_ROOM);
+          }
         });
 
         function help() {
-          if (!state.uid) {
+          if (!model.uid) {
             return log("you're not logged in yet, this should happen automatically");
           }
-          if (!state.current_room) {
-            return log("you're not in a room, try making one with /make or joining one with /join (/list to see which rooms exist)");
+          if (!model.room) {
+            return log("waiting for room to load, this should happen automatically");
           }
-          if (state.rooms[state.current_room].state != ROOM_STATES.WAITING_TO_START) {
-            return log(`game '${state.current_room}' hasn't started yet, try /start`);
+          if (model.room.players.indexOf(model.uid) === -1) {
+            return log("you're currently observing this game, try /join if you want to play");
+          }
+          if (model.room.state === ROOM_STATES.WAITING_TO_START) {
+            return log("this game hasn't started yet, try /start");
           }
           return log("[UNREACHABLE] this shit is busted, my bad");
         }
-        function makeRoom(name) {
-          app.firestore().collection("rooms").doc(name).set({
-            players: [],
-            state: ROOM_STATES.WAITING_TO_START,
-          }).then(doc => {
-            log(`created room ${name}`);
-            m.redraw();
-          });
-          return log(`creating room '${name}'...`);
-        }
-        function listRooms() {
-          const rooms = Object.keys(state.rooms)
-            .map(room_id => `${room_id} [${state.rooms[room_id].players.length}]`);
-          return log(`rooms: ${rooms}`);
-        }
-        function joinRoom(name) {
-          const doc = app.firestore().collection("rooms").doc(name);
-          doc.update({
-            players: firebase.firestore.FieldValue.arrayUnion(state.uid),
-          }).then(() => {
-            log(`joined room ${name}`);
-            state.current_room = name;
-            m.redraw();
-          });
-          return log(`joining room ${name}...`);
-        }
         function startGame() {
-          if (!state.current_room) {
+          if (!model.room.state) {
             return log("can't start until you've joined a room");
           } 
-          const room = state.rooms[state.current_room];
-          if (room.state != ROOM_STATES.WAITING_TO_START) {
-            return log(`game ${state.current_room} has already started`);
+          if (model.room.state != ROOM_STATES.WAITING_TO_START) {
+            return log(`game has already started`);
+          }
+
+          const hand_size = handSize(model.room.players.length);
+          if (hand_size < 0) {
+            return log(`wrong number of players, we can support 2--5, you have ${model.room.players.length}`);
           }
           let deck = generateDeck();
           let hands = {};
-          const hand_size = handSize(room.players.length);
-          state.room.players.forEach(player => {
+          model.room.players.forEach(player => {
             hands[player] = drawTiles(deck, hand_size);
           });
-          app.firestore().collection("rooms").doc(state.current_room).update({
-            state: `waiting for ${firstPlayer}`
+          remote.room.update({
+            draw_pile: deck,
+            discard_pile: [],
+            hands,
+            state: `waiting for ${model.room.players[0]}`
           });
-          return log("listRooms unimplemented");
+          return log("game has begun!");
         }
         const commands = {
           help: help,
-          make: makeRoom,
-          list: listRooms,
-          join: joinRoom,
           start: startGame,
         };
         function perform(action) {
-          if (!state.uid) {
+          if (!model.uid) {
             console.warn("not logged in");
             return false;
           }
@@ -166,8 +198,7 @@
         }
 
         app.auth().signInAnonymously();
-        console.log("hello, world!");
-        function onUserInput(evt) {
+        function handler(evt) {
           const v = evt.srcElement.value;
           if (perform(v)) {
             evt.srcElement.value = "";
@@ -175,7 +206,7 @@
             console.warn("invalid action: ", v);
           }
         }
-        m.mount(document.body, state);
+        m.mount(document.body, model);
       });
     </script>
 </html>
