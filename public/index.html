@@ -322,8 +322,9 @@
           if (model.hints === 0) {
             return log("no hints left");
           }
-          const matching_players = model.room.players
-                                .filter(p => p !== model.uid && p.startsWith(target_prefix));
+          const matching_players =
+            model.room.players.filter(p =>
+              p !== model.uid && p.toLowerCase().startsWith(target_prefix.toLowerCase()));
           if (matching_players.length === 0) {
             return log("prefix doesn't match any of the others players");
           }
