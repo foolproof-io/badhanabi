@@ -26,6 +26,12 @@
     .current_player {
       border: solid black 4px;
     }
+    #helptext {
+      font-style: italic;
+    }
+    #actions {
+      font-family: monospace;
+    }
     </style>
     <script defer src="/__/firebase/5.8.3/firebase-app.js"></script>
     <script defer src="/__/firebase/5.8.3/firebase-auth.js"></script>
@@ -155,9 +161,11 @@
           autofocus: true,
         }),
 
+        m('div', { id: "helptext" }, model.helptext),
+
         m('div', {
-          id: "messages",
-        }, model.messages.map(msg => m('p', msg)).reverse()),
+          id: "actions",
+        }, model.actions.map(msg => m('p', msg.text))),
       ]);
     }
     function viewPlayPile(play_pile) {
@@ -217,17 +225,17 @@
       document.addEventListener('DOMContentLoaded', function() {
         const room_id = window.location.pathname.substring(1);
         let model = {
-          messages: ["try /help"],
+          actions: [],
+          helptext: "try /help",
           room: {},
         };
         model.view = () => viewModel(model, handler);
 
-        function log(msg) {
-          model.messages.push(msg);
-          return true;
-        }
-
         const app = firebase.app();
+        const remote = {
+          room: app.firestore().collection("rooms").doc(room_id),
+          actions: app.firestore().collection("rooms").doc(room_id).collection("actions"),
+        };
         app.auth().onAuthStateChanged(evt => {
           model.uid = evt.uid;
           if (model.uid) {
@@ -236,10 +244,6 @@
             }, {merge:true});
           }
         });
-        const remote = {
-          room: app.firestore().collection("rooms").doc(room_id),
-          actions: app.firestore().collection("rooms").doc(room_id).collection("actions"),
-        };
         remote.room.onSnapshot(snap => {
           console.log("room: ", snap);
           if (snap.exists) {
@@ -247,30 +251,47 @@
             m.redraw();
           }
         });
+        remote.actions.orderBy("time", "desc").onSnapshot(snap => {
+          console.log("actions: ", snap);
+          model.actions = snap.docs.map(doc => doc.data());
+          m.redraw();
+        });
+
+        function note(msg) {
+          model.helptext = msg;
+          return true;
+        }
+        function log(msg) {
+          remote.actions.add({
+            time: firebase.firestore.FieldValue.serverTimestamp(),
+            text: msg,
+          });
+          return true;
+        }
 
         function help() {
           if (!model.uid) {
-            return log("you're not logged in yet, this should happen automatically");
+            return note("you're not logged in yet, this should happen automatically");
           }
           if (!model.room) {
-            return log("waiting for room to load, this should happen automatically");
+            return note("waiting for room to load, this should happen automatically");
           }
           if (!model.room.state) {
-            return log("this game hasn't started yet, try /start");
+            return note("this game hasn't started yet, try /start");
           }
           if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
-            return log("it's not your turn right now");
+            return note("it's not your turn right now");
           }
-          return log("you can /discard <tile_idx>, /play <tile_idx>, or /hint <player> <hint>");
+          return note("you can /discard <tile_idx>, /play <tile_idx>, or /hint <player> <hint>");
         }
         function startGame() {
           if (model.room.state) {
-            return log(`game has already started`);
+            return note(`game has already started`);
           }
 
           const hand_size = handSize(model.room.players.length);
           if (hand_size < 0) {
-            return log(`wrong number of players, we can support 2--5, you have ${model.room.players.length}`);
+            return note(`wrong number of players, we can support 2--5, you have ${model.room.players.length}`);
           }
           let deck = generateDeck();
           let hands = {};
@@ -290,12 +311,12 @@
         }
         function discardTile(idx_str) {
           if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
-            return log("not your turn");
+            return note("not your turn");
           }
           const idx = Number(idx_str);
           const hand = model.room.hands[model.uid];
           if (!hand[idx] || !hand[idx].tile) {
-            return log(`can't discard that, try again`);
+            return note(`can't discard that, try again`);
           }
           let update = {};
           update.state = ROOM_STATES.WAITING_FOR_PLAYER(playerAfter(model.room.players, model.uid));
@@ -309,24 +330,26 @@
           }
           update[`hands.${model.uid}`] = next_hand;
           remote.room.update(update);
-          return log(`discarding ${hand[idx].tile}`);
+          return log(`${model.uid} discarded ${hand[idx].tile}`);
         }
         function playTile(idx_str) {
           if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
-            return log("not your turn");
+            return note("not your turn");
           }
           const idx = Number(idx_str);
           const hand = model.room.hands[model.uid];
           if (!hand[idx] || !hand[idx].tile) {
-            return log(`can't play that, try again`);
+            return note(`can't play that, try again`);
           }
           let update = {};
           update.state = ROOM_STATES.WAITING_FOR_PLAYER(playerAfter(model.room.players, model.uid));
           if (isLegalPlay(model.room.play_pile, hand[idx].tile)) {
             update.play_pile = model.room.play_pile.concat(hand[idx].tile);
+            log(`${model.uid} played ${hand[idx].tile}`);
           } else {
             update.errors = model.room.errors + 1;
             update.discard_pile = model.room.discard_pile.concat(hand[idx].tile);
+            log(`${model.uid} tried to play ${hand[idx].tile}`);
           }
           const next_tile = model.room.draw_pile[0];
           if (next_tile) {
@@ -337,38 +360,37 @@
             });
           }
           remote.room.update(update);
-          return log(`playing ${hand[idx].tile}`);
         }
         function giveHint(target_prefix, hint) {
           if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
-            return log("not your turn");
+            return note("not your turn");
           }
           if (model.hints === 0) {
-            return log("no hints left");
+            return note("no hints left");
           }
           const matching_players =
             model.room.players.filter(p =>
               p !== model.uid && p.toLowerCase().startsWith(target_prefix.toLowerCase()));
           if (matching_players.length === 0) {
-            return log("prefix doesn't match any of the others players");
+            return note("prefix doesn't match any of the others players");
           }
           if (matching_players.length > 1) {
-            return log(`prefix matches ${matching_players.length} players`);
+            return note(`prefix matches ${matching_players.length} players`);
           }
           const target_player = matching_players[0];
           if (model.room.players.indexOf(target_player) === -1) {
-            return log("no such player");
+            return note("no such player");
           }
           const h = hint.toUpperCase(); // canonicalize to uppercase
           if (h.length !== 1 || COLORS.indexOf(h) === -1 && RANKS.indexOf(h) === -1) {
-            return log("invalid hint");
+            return note("invalid hint");
           }
           let update = {};
           update.state = ROOM_STATES.WAITING_FOR_PLAYER(playerAfter(model.room.players, model.uid));
           update.hints = model.room.hints - 1;
           update[`hands.${target_player}`] = applyHintToHand(model.room.hands[target_player], h);
           remote.room.update(update);
-          return log(`telling ${target_player} about ${hint}`);
+          return log(`${model.uid} told ${target_player} about ${hint}`);
         }
         const commands = {
           help: help,
