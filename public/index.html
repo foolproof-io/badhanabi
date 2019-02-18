@@ -60,15 +60,23 @@
       return players[(idx + 1) % players.length];
     }
 
-    function isLegalPlay(played, tile) {
-      const color = tile[0];
-      let highest_of_color = 0;
-      played.forEach(p => {
-        if (p[0] == color && Number(p[1]) > highest_of_color) {
-          highest_of_color = Number(p[1]);
-        }
+    function summarizePlayPile(play_pile) {
+      let highest_by_color = {};
+      COLORS.forEach(c => {
+        highest_by_color[c] = 0;
       });
-      return Number(tile[1]) === highest_of_color + 1;
+      play_pile.forEach(tile => {
+        const c = tile[0];
+        const r = Number(tile[1]);
+        highest_by_color[c] = Math.max(highest_by_color[c], r);
+      });
+      return highest_by_color;
+    }
+    function isLegalPlay(play_pile, tile) {
+      const summary = summarizePlayPile(play_pile);
+      const c = tile[0];
+      const r = Number(tile[1]);
+      return r === summary[c] + 1;
     }
     function applyHintToHand(hand, hint) {
       let applied = hand.map(item => {
@@ -99,8 +107,8 @@
         m('div', { id: "state", }, model.room.state || "waiting to start"),
         m('div', { id: "hints", }, `Hints: ${model.room.hints}`),
         m('div', { id: "errors", }, `Errors: ${model.room.errors}`),
-        m('div', { id: "discards", }, `Discards: ${model.room.discard_pile}`),
-        m('div', { id: "plays", }, `Plays: ${model.room.play_pile}`),
+        m('div', { id: "discards", }, `Discards: ${model.room.discard_pile || []}`),
+        m('div', { id: "plays", }, [ "Plays:", viewPlayPile(model.room.play_pile || []) ]),
 
         m('div', {
           id: "players",
@@ -125,6 +133,15 @@
           id: "messages",
         }, model.messages.map(msg => m('p', msg)).reverse()),
       ]);
+    }
+    function viewPlayPile(play_pile) {
+      const summary = summarizePlayPile(play_pile);
+      return m('table', [
+        m('tr', COLORS.map(c => m('td', viewPile(c, summary[c])))),
+      ]);
+    }
+    function viewPile(color, rank) {
+        return `${color}${rank}`;
     }
     function viewHand(hand, hide_tiles) {
       return m('table', [
