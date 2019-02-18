@@ -129,7 +129,7 @@
           id: "players",
         }, [
           "Players:",
-          (model.room.players || []).map(player => {
+          rotateToLast(model.room.players || [], model.uid).map(player => {
             if (!model.room.hands) {
               return m('p', player);
             }
@@ -145,6 +145,7 @@
           id: "user_input",
           onchange: handler,
           placeholder: "user_input goes here",
+          autofocus: true,
         }),
 
         m('div', {
@@ -187,6 +188,13 @@
     }
     function viewHint(hint) {
       return m('p', hint);
+    }
+
+    function rotateToLast(xs, x) {
+      const idx = xs.indexOf(x);
+      return idx === -1
+        ? xs
+        : xs.slice(idx + 1).concat(xs.slice(0, idx + 1));
     }
     </script>
     <script>
