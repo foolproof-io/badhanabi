@@ -4,12 +4,21 @@
     <meta charset="utf-8">
     <title>Bad Hanabi</title>
     <style>
-    img {
+    body {
+      background-color: #DDDDDD;
+    }
+    .tile {
       width: 40px;
+    }
+    .pile {
+      width: 60px;
     }
     td {
       width: 50px;
       text-align: center;
+    }
+    .current_player {
+      background-color: #BBBBBB;
     }
     </style>
     <script defer src="/__/firebase/5.8.3/firebase-app.js"></script>
@@ -89,8 +98,13 @@
       return applied;
     }
 
-    function applyDiscardToHand(hand, idx) {
-      return hand.slice(0, idx).concat(hand.slice(idx+1));
+    function removeCardFromHand(hand, idx) {
+      let minus_card = hand.slice(0, idx).concat(hand.slice(idx+1));
+      // trim off any leading hints, they give no information
+      while (minus_card.length > 0 && minus_card[0].hint) {
+        minus_card.shift();
+      }
+      return minus_card;
     }
 
     function matchesHint(tile, hint) {
@@ -102,9 +116,10 @@
       WAITING_FOR_PLAYER: player => `waiting for ${player}`,
     };
     function viewModel(model, handler) {
-      return m("main", [
+      return m("div", [
         m('div', { id: "whoami", }, `You are: ${model.uid}`),
         m('div', { id: "state", }, model.room.state || "waiting to start"),
+        m('div', { id: "draws", }, `Draws: ${(model.room.draw_pile || []).length}`),
         m('div', { id: "hints", }, `Hints: ${model.room.hints}`),
         m('div', { id: "errors", }, `Errors: ${model.room.errors}`),
         m('div', { id: "discards", }, `Discards: ${model.room.discard_pile || []}`),
@@ -119,7 +134,10 @@
               return m('p', player);
             }
             const hand = viewHand(model.room.hands[player], player === model.uid);
-            return m('p', [ player, hand ]);
+            return m('div', {
+              class: model.room.state === ROOM_STATES.WAITING_FOR_PLAYER(player)
+                ? "current_player" : "waiting_player",
+            }, [ player, hand ]);
           })
         ]),
 
@@ -141,10 +159,13 @@
       ]);
     }
     function viewPile(color, rank) {
-        return `${color}${rank}`;
+        return m('img', {
+          class: "pile",
+          src: `./imgs/piles/${color}${rank}.svg`
+        });
     }
     function viewHand(hand, hide_tiles) {
-      return m('table', [
+      return m('table', { style: "border: 2px" } ,[
         m('tr', hand.map((item, idx) => m('td', idx))),
         m('tr', hand.map(item => m('td', viewHandItem(item, hide_tiles)))),
       ]);
@@ -156,7 +177,10 @@
     }
     function viewTile(tile, hide_tiles) {
       return m('div', [
-        m('img', { src: `./imgs/tiles/${hide_tiles ? "uu" : tile.tile.toLowerCase()}.svg` }),
+        m('img', {
+          class: "tile",
+          src: `./imgs/tiles/${hide_tiles ? "UU" : tile.tile}.svg`
+        }),
         m('br'),
         `[${tile.hints}]`
       ]);
@@ -254,13 +278,12 @@
           update.hints = model.room.hints + 1;
           update.discard_pile = model.room.discard_pile.concat(hand[idx].tile);
           const next_tile = model.room.draw_pile[0];
+          let next_hand = removeCardFromHand(hand, idx);
           if (next_tile) {
             update.draw_pile = model.room.draw_pile.slice(1);
-            update[`hands.${model.uid}`] = applyDiscardToHand(hand, idx).concat({
-              tile: next_tile,
-              hints: [],
-            });
+            next_hand.push({ tile: next_tile, hints: [] });
           }
+          update[`hands.${model.uid}`] = next_hand;
           remote.room.update(update);
           return log(`discarding ${hand[idx].tile}`);
         }
@@ -284,7 +307,7 @@
           const next_tile = model.room.draw_pile[0];
           if (next_tile) {
             update.draw_pile = model.room.draw_pile.slice(1);
-            update[`hands.${model.uid}`] = applyDiscardToHand(hand, idx).concat({
+            update[`hands.${model.uid}`] = removeCardFromHand(hand, idx).concat({
               tile: next_tile,
               hints: [],
             });
