@@ -5,7 +5,17 @@
     <title>Bad Hanabi</title>
     <style>
     body {
-      background-color: #DDDDDD;
+      background-color: #FFFFFF;
+      width: 80%;
+      text-align: center;
+      line-height: 25px;
+    }
+    table {
+      margin: auto;
+    }
+    td {
+      width: 50px;
+      text-align: center;
     }
     .tile {
       width: 40px;
@@ -13,12 +23,8 @@
     .pile {
       width: 60px;
     }
-    td {
-      width: 50px;
-      text-align: center;
-    }
     .current_player {
-      background-color: #BBBBBB;
+      border: solid black 4px;
     }
     </style>
     <script defer src="/__/firebase/5.8.3/firebase-app.js"></script>
@@ -30,6 +36,7 @@
     <script>
     const COLORS = ['R', 'G', 'B', 'Y', 'W', 'P'];
     const RANKS = ['1', '2', '3', '4', '5'];
+    const UNKNOWN = "UU";
     function generateDeck() {
       let tiles = [];
       COLORS.forEach(c => {
@@ -133,11 +140,11 @@
             if (!model.room.hands) {
               return m('p', player);
             }
-            const hand = viewHand(model.room.hands[player], player === model.uid);
+            const hand = model.room.hands[player];
+            const player_view = viewPlayer(player, player === model.uid ? redactTiles(hand) : hand);
             return m('div', {
-              class: model.room.state === ROOM_STATES.WAITING_FOR_PLAYER(player)
-                ? "current_player" : "waiting_player",
-            }, [ player, hand ]);
+              class: model.room.state === ROOM_STATES.WAITING_FOR_PLAYER(player) ? "current_player" : "waiting_player",
+            }, player_view);
           })
         ]),
 
@@ -162,13 +169,16 @@
     function viewPile(color, rank) {
         return m('img', {
           class: "pile",
-          src: `./imgs/piles/${color}${rank}.svg`
+          src: `./imgs/piles/${color}${rank}.svg`,
         });
     }
-    function viewHand(hand, hide_tiles) {
-      return m('table', { style: "border: 2px" } ,[
-        m('tr', hand.map((item, idx) => m('td', idx))),
-        m('tr', hand.map(item => m('td', viewHandItem(item, hide_tiles)))),
+    function viewPlayer(player_name, hand, options) {
+      return m('div', [
+        player_name,
+        m('table', [
+          m('tr', hand.map((item, idx) => m('td', idx))),
+          m('tr', hand.map(item => m('td', viewHandItem(item)))),
+        ]),
       ]);
     }
     function viewHandItem(item, hide_tiles) {
@@ -180,7 +190,7 @@
       return m('div', [
         m('img', {
           class: "tile",
-          src: `./imgs/tiles/${hide_tiles ? "UU" : tile.tile}.svg`
+          src: `./imgs/tiles/${hide_tiles ? UNKNOWN : tile.tile}.svg`
         }),
         m('br'),
         `[${tile.hints}]`
@@ -196,12 +206,18 @@
         ? xs
         : xs.slice(idx + 1).concat(xs.slice(0, idx + 1));
     }
+    function redactTiles(hand) {
+      return hand.map(item => item.tile ? redactTile(item) : item);
+    }
+    function redactTile(item) {
+      return { tile: UNKNOWN, hints: item.hints };
+    }
     </script>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         const room_id = window.location.pathname.substring(1);
         let model = {
-          messages: [],
+          messages: ["try /help"],
           room: {},
         };
         model.view = () => viewModel(model, handler);
