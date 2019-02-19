@@ -346,6 +346,9 @@
           if (isLegalPlay(model.room.play_pile, hand[idx].tile)) {
             update.play_pile = model.room.play_pile.concat(hand[idx].tile);
             log(`${model.uid} played ${hand[idx].tile}`);
+            if (hand[idx].tile[1] === "5") {
+              update.hints = model.room.hints + 1;
+            }
           } else {
             update.errors = model.room.errors + 1;
             update.discard_pile = model.room.discard_pile.concat(hand[idx].tile);
