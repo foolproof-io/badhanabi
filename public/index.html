@@ -365,7 +365,7 @@
           if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
             return note("not your turn");
           }
-          if (model.hints === 0) {
+          if (model.room.hints === 0) {
             return note("no hints left");
           }
           const matching_players =
