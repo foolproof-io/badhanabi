@@ -140,7 +140,7 @@ function viewModel(model, handler) {
 
     m('input', {
       id: "user_input",
-      onchange: handler,
+      onkeypress: handler,
       placeholder: "user_input goes here",
       autofocus: true,
     }),
@@ -427,8 +427,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
   app.auth().signInAnonymously();
   function handler(evt) {
+    if (evt.type !== "keypress") {
+      console.warn("event wasn't a keypress, that's surprising");
+    }
     const v = evt.srcElement.value;
-    if (perform(v)) {
+    if (evt.key === "Enter" && perform(v)) {
       evt.srcElement.value = "";
     } else {
       console.warn("invalid action: ", v);
