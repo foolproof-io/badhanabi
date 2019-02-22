@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
     "esModuleInterop": true,
-    "strictNullChecks": true,
     "lib": [
       "dom",
       "es6"

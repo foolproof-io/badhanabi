@@ -45016,65 +45016,24 @@ var mithril_1 = __importDefault(require("mithril"));
 var firebase = __importStar(require("firebase/app"));
 require("firebase/auth");
 require("firebase/firestore");
-firebase.initializeApp({
-    apiKey: "AIzaSyBIb0BX7QA5K42j12QZH_E3UB8QH_sPpr8",
-    projectId: "foolproof-hanabi"
-});
-var Color;
-(function (Color) {
-    Color["Red"] = "R";
-    Color["Green"] = "G";
-    Color["Blue"] = "B";
-    Color["Yellow"] = "Y";
-    Color["White"] = "W";
-    Color["Purple"] = "P";
-})(Color || (Color = {}));
-var COLORS = [
-    Color.Red,
-    Color.Green,
-    Color.Blue,
-    Color.Yellow,
-    Color.White,
-    Color.Purple,
-];
-var Rank;
-(function (Rank) {
-    Rank[Rank["One"] = 1] = "One";
-    Rank[Rank["Two"] = 2] = "Two";
-    Rank[Rank["Three"] = 3] = "Three";
-    Rank[Rank["Four"] = 4] = "Four";
-    Rank[Rank["Five"] = 5] = "Five";
-})(Rank || (Rank = {}));
-var RANKS = [
-    Rank.One,
-    Rank.Two,
-    Rank.Three,
-    Rank.Four,
-    Rank.Five,
-];
+console.log("typescript");
+var COLORS = ['R', 'G', 'B', 'Y', 'W', 'P'];
+var RANKS = ['1', '2', '3', '4', '5'];
 var UNKNOWN = "UU";
-function unreachable(_) { }
-function numTilesInDeck(tile) {
-    switch (tile.rank) {
-        case Rank.One: return 3;
-        case Rank.Two: return 2;
-        case Rank.Three: return 2;
-        case Rank.Four: return 2;
-        case Rank.Five: return 1;
-    }
-}
 function generateDeck() {
     var tiles = [];
-    for (var _i = 0, COLORS_1 = COLORS; _i < COLORS_1.length; _i++) {
-        var color = COLORS_1[_i];
-        for (var _a = 0, RANKS_1 = RANKS; _a < RANKS_1.length; _a++) {
-            var rank = RANKS_1[_a];
-            var tile = { color: color, rank: rank };
-            for (var i = 0; i < numTilesInDeck(tile); i++) {
-                tiles.push(tile);
-            }
-        }
-    }
+    COLORS.forEach(function (c) {
+        tiles.push(c + "1");
+        tiles.push(c + "1");
+        tiles.push(c + "1");
+        tiles.push(c + "2");
+        tiles.push(c + "2");
+        tiles.push(c + "3");
+        tiles.push(c + "3");
+        tiles.push(c + "4");
+        tiles.push(c + "4");
+        tiles.push(c + "5");
+    });
     return _.shuffle(tiles);
 }
 function handSize(num_players) {
@@ -45154,11 +45113,11 @@ function viewModel(model, handler) {
             id: "players"
         }, [
             "Players:",
-            rotateToLast(model.room.players, model.uid).map(function (player) {
+            rotateToLast(model.room.players || [], model.uid).map(function (player) {
                 if (!model.room.hands) {
                     return mithril_1["default"]('p', player);
                 }
-                var hand = model.room.hands.get(player);
+                var hand = model.room.hands[player];
                 var player_view = viewPlayer(player, player === model.uid ? redactTiles(hand) : hand);
                 return mithril_1["default"]('div', {
                     "class": model.room.state === ROOM_STATES.WAITING_FOR_PLAYER(player) ? "current_player" : "waiting_player"
@@ -45199,24 +45158,19 @@ function viewPlayer(player_name, hand) {
     ]);
 }
 function viewHandItem(item) {
-    return item
-        ? viewHeldTile(item)
+    return item.tile
+        ? viewTile(item)
         : viewHint(item.hint);
 }
-function viewHeldTile(item) {
+function viewTile(tile) {
     return mithril_1["default"]('div', [
         mithril_1["default"]('img', {
             "class": "tile",
-            src: tileImg(item.tile)
+            src: "./imgs/tiles/" + tile.tile + ".svg"
         }),
         mithril_1["default"]('br'),
-        "[" + item.hints + "]"
+        "[" + tile.hints + "]"
     ]);
-}
-function tileImg(tile) {
-    return tile
-        ? "./imgs/tiles/" + tile.color + tile.rank + ".svg"
-        : "./imgs/tiles/UU.svg";
 }
 function viewHint(hint) {
     return mithril_1["default"]('p', hint);
@@ -45228,19 +45182,31 @@ function rotateToLast(xs, x) {
         : xs.slice(idx + 1).concat(xs.slice(0, idx + 1));
 }
 function redactTiles(hand) {
-    return hand.map(function (item) { return item ? redactTile(item) : item; });
+    return hand.map(function (item) { return item.tile ? redactTile(item) : item; });
 }
 function redactTile(item) {
-    return { hints: item.hints };
+    return { tile: UNKNOWN, hints: item.hints };
 }
 document.addEventListener('DOMContentLoaded', function () {
+    firebase.initializeApp({
+        apiKey: "AIzaSyBIb0BX7QA5K42j12QZH_E3UB8QH_sPpr8",
+        projectId: "foolproof-hanabi"
+    });
     var room_id = window.location.pathname.substring(1);
     var model = {
         actions: [],
         helptext: "try /help",
         room: {
-            players: []
+            state: null,
+            players: [],
+            hands: null,
+            errors: null,
+            hints: null,
+            discard_pile: null,
+            play_pile: null,
+            draw_pile: null
         },
+        uid: null,
         view: function () { return viewModel(model, handler); }
     };
     var app = firebase.app();
@@ -45257,12 +45223,14 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
     remote.room.onSnapshot(function (snap) {
+        console.log("room: ", snap);
         if (snap.exists) {
             model.room = snap.data();
             mithril_1["default"].redraw();
         }
     });
     remote.actions.orderBy("time", "desc").onSnapshot(function (snap) {
+        console.log("actions: ", snap);
         model.actions = snap.docs.map(function (doc) { return doc.data(); });
         mithril_1["default"].redraw();
     });

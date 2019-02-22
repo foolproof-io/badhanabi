@@ -4,71 +4,26 @@ import * as firebase from 'firebase/app';
 import 'firebase/auth';
 import 'firebase/firestore';
 
-firebase.initializeApp({
-  apiKey: "AIzaSyBIb0BX7QA5K42j12QZH_E3UB8QH_sPpr8",
-  projectId: "foolproof-hanabi",
-});
 
-enum Color {
-  Red = "R",
-  Green = "G",
-  Blue = "B",
-  Yellow = "Y",
-  White = "W",
-  Purple = "P",
-}
-const COLORS: Color[] = [
-  Color.Red,
-  Color.Green,
-  Color.Blue,
-  Color.Yellow,
-  Color.White,
-  Color.Purple,
-];
+console.log("typescript");
 
-enum Rank {
-  One = 1,
-  Two = 2,
-  Three = 3,
-  Four = 4,
-  Five = 5,
-}
-const RANKS: Rank[] = [
-  Rank.One,
-  Rank.Two,
-  Rank.Three,
-  Rank.Four,
-  Rank.Five,
-];
+const COLORS = ['R', 'G', 'B', 'Y', 'W', 'P'];
+const RANKS = ['1', '2', '3', '4', '5'];
 const UNKNOWN = "UU";
-
-interface Tile {
-  color: Color;
-  rank: Rank;
-}
-
-function unreachable(_: never) {}
-
-function numTilesInDeck(tile: Tile): number {
-  switch (tile.rank) {
-    case Rank.One: return 3;
-    case Rank.Two: return 2;
-    case Rank.Three: return 2;
-    case Rank.Four: return 2;
-    case Rank.Five: return 1;
-  }
-}
-
 function generateDeck() {
-  let tiles: Tile[] = [];
-  for (let color of COLORS) {
-    for (let rank of RANKS) {
-      const tile: Tile = { color, rank };
-      for (let i=0; i < numTilesInDeck(tile); i++) {
-        tiles.push(tile)
-      }
-    }
-  }
+  let tiles = [];
+  COLORS.forEach(c => {
+    tiles.push(`${c}1`);
+    tiles.push(`${c}1`);
+    tiles.push(`${c}1`);
+    tiles.push(`${c}2`);
+    tiles.push(`${c}2`);
+    tiles.push(`${c}3`);
+    tiles.push(`${c}3`);
+    tiles.push(`${c}4`);
+    tiles.push(`${c}4`);
+    tiles.push(`${c}5`);
+  });
   return _.shuffle(tiles);
 }
 function handSize(num_players) {
@@ -80,22 +35,11 @@ function handSize(num_players) {
     default: return -1;
   }
 }
-
-type Hint = Color | Rank;
-interface HeldTile {
-  tile?: Tile;
-  hints: Hint[];
-}
-interface HeldHint {
-  hint: Hint;
-}
-type HandItem = HeldTile | HeldHint;
-
 const NUM_INITIAL_HINTS = 8;
-function drawTiles(tiles: Tile[], num_tiles: number): HeldTile[] {
-  let ts: HeldTile[] = [];
+function drawTiles(tiles, num_tiles) {
+  let ts = [];
   for (let i=0; i < num_tiles; i++) {
-    ts.push({ tile: tiles.pop()!, hints: [] });
+    ts.push({ tile: tiles.pop(), hints: [] });
   }
   return ts;
 }
@@ -151,7 +95,7 @@ const ROOM_STATES = {
   WAITING_TO_START: "waiting to start",
   WAITING_FOR_PLAYER: player => `waiting for ${player}`,
 };
-function viewModel(model: Model, handler) {
+function viewModel(model, handler) {
   return m("div", [
     m('div', { id: "whoami", }, `You are: ${model.uid}`),
     m('div', { id: "state", }, model.room.state || "waiting to start"),
@@ -165,11 +109,11 @@ function viewModel(model: Model, handler) {
       id: "players",
     }, [
       "Players:",
-      rotateToLast(model.room.players, model.uid!).map(player => {
+      rotateToLast(model.room.players || [], model.uid).map(player => {
         if (!model.room.hands) {
           return m('p', player);
         }
-        const hand = model.room.hands.get(player)!;
+        const hand = model.room.hands[player];
         const player_view = viewPlayer(player, player === model.uid ? redactTiles(hand) : hand);
         return m('div', {
           class: model.room.state === ROOM_STATES.WAITING_FOR_PLAYER(player) ? "current_player" : "waiting_player",
@@ -191,19 +135,19 @@ function viewModel(model: Model, handler) {
     }, model.actions.map(msg => m('p', msg.text))),
   ]);
 }
-function viewPlayPile(play_pile: Tile[]): m.Child {
+function viewPlayPile(play_pile) {
   const summary = summarizePlayPile(play_pile);
   return m('table', [
     m('tr', COLORS.map(c => m('td', viewPile(c, summary[c])))),
   ]);
 }
-function viewPile(color: Color, rank: Color): m.Child {
+function viewPile(color, rank) {
     return m('img', {
       class: "pile",
       src: `./imgs/piles/${color}${rank}.svg`,
     });
 }
-function viewPlayer(player_name: PlayerId, hand: HandItem[]): m.Child {
+function viewPlayer(player_name, hand) {
   return m('div', [
     player_name,
     m('table', [
@@ -212,76 +156,57 @@ function viewPlayer(player_name: PlayerId, hand: HandItem[]): m.Child {
     ]),
   ]);
 }
-function viewHandItem(item: HandItem): m.Child {
-  return (<HeldTile>item)
-    ? viewHeldTile(<HeldTile>item)
-    : viewHint((<HeldHint>item).hint);
+function viewHandItem(item) {
+  return item.tile
+    ? viewTile(item)
+    : viewHint(item.hint);
 }
-function viewHeldTile(item: HeldTile): m.Child {
+function viewTile(tile) {
   return m('div', [
     m('img', {
       class: "tile",
-      src: tileImg(item.tile),
+      src: `./imgs/tiles/${tile.tile}.svg`
     }),
     m('br'),
-    `[${item.hints}]`
+    `[${tile.hints}]`
   ]);
 }
-function tileImg(tile?: Tile): string {
-  return tile
-    ? `./imgs/tiles/${tile.color}${tile.rank}.svg`
-    : `./imgs/tiles/UU.svg`;
-}
-
-
-function viewHint(hint: Hint): m.Child {
+function viewHint(hint) {
   return m('p', hint);
 }
 
-function rotateToLast<T>(xs: T[], x: T): T[] {
+function rotateToLast(xs, x) {
   const idx = xs.indexOf(x);
   return idx === -1
     ? xs
     : xs.slice(idx + 1).concat(xs.slice(0, idx + 1));
 }
-function redactTiles(hand: HandItem[]): HandItem[] {
-  return hand.map(item => (<HeldTile>item) ? redactTile(<HeldTile>item) : item);
+function redactTiles(hand) {
+  return hand.map(item => item.tile ? redactTile(item) : item);
 }
-function redactTile(item: HeldTile): HeldTile {
-  return { hints: item.hints };
+function redactTile(item) {
+  return { tile: UNKNOWN, hints: item.hints };
 }
-
-interface Model {
-  helptext: string;
-  actions: LoggedAction[];
-  room: Room;
-  uid?: PlayerId;
-  view(): m.Child;
-}
-interface LoggedAction {
-  text: string;
-}
-interface Room {
-  state?: GameState;
-  players: PlayerId[];
-  hands?: Map<PlayerId, HandItem[]>;
-  errors?: number;
-  hints?: number;
-  discard_pile?: Tile[];
-  draw_pile?: Tile[];
-  play_pile?: Tile[];
-}
-type GameState = string;
-type PlayerId = string;
-
 document.addEventListener('DOMContentLoaded', function() {
+  firebase.initializeApp({
+    apiKey: "AIzaSyBIb0BX7QA5K42j12QZH_E3UB8QH_sPpr8",
+    projectId: "foolproof-hanabi",
+  });
   const room_id = window.location.pathname.substring(1);
-  let model: Model = {
+  let model = {
     actions: [],
     helptext: "try /help",
     room: {
+      state: null,
       players: [],
+      hands: null,
+      errors: null,
+      hints: null,
+      discard_pile: null,
+      play_pile: null,
+      draw_pile: null,
     },
+    uid: null,
     view: () => viewModel(model, handler),
   };
 
@@ -291,7 +216,7 @@ document.addEventListener('DOMContentLoaded', function() {
     actions: app.firestore().collection("rooms").doc(room_id).collection("actions"),
   };
   app.auth().onAuthStateChanged(evt => {
-    model.uid = evt!.uid;
+    model.uid = evt.uid;
     if (model.uid) {
       remote.room.set({
         players: firebase.firestore.FieldValue.arrayUnion(model.uid),
@@ -299,13 +224,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   remote.room.onSnapshot(snap => {
+    console.log("room: ", snap);
     if (snap.exists) {
       model.room = snap.data() as any;
       m.redraw();
     }
   });
   remote.actions.orderBy("time", "desc").onSnapshot(snap => {
-    model.actions = snap.docs.map(doc => doc.data() as any);
+    console.log("actions: ", snap);
+    model.actions = snap.docs.map(doc => doc.data());
     m.redraw();
   });
 
@@ -366,18 +293,18 @@ document.addEventListener('DOMContentLoaded', function() {
       return note("not your turn");
     }
     const idx = Number(idx_str);
-    const hand = model.room.hands![model.uid!];
+    const hand = model.room.hands[model.uid];
     if (!hand[idx] || !hand[idx].tile) {
       return note(`can't discard that, try again`);
     }
     let update = {};
     update["state"] = ROOM_STATES.WAITING_FOR_PLAYER(playerAfter(model.room.players, model.uid));
-    update["hints"] = model.room.hints! + 1;
-    update["discard_pile"] = model.room.discard_pile!.concat(hand[idx].tile);
-    const next_tile = model.room.draw_pile![0];
+    update["hints"] = model.room.hints + 1;
+    update["discard_pile"] = model.room.discard_pile.concat(hand[idx].tile);
+    const next_tile = model.room.draw_pile[0];
     let next_hand = removeCardFromHand(hand, idx);
     if (next_tile) {
-      update["draw_pile"] = model.room.draw_pile!.slice(1);
+      update["draw_pile"] = model.room.draw_pile.slice(1);
       next_hand.push({ tile: next_tile, hints: [] });
     }
     update[`hands.${model.uid}`] = next_hand;
@@ -389,26 +316,26 @@ document.addEventListener('DOMContentLoaded', function() {
       return note("not your turn");
     }
     const idx = Number(idx_str);
-    const hand = model.room.hands![model.uid!];
+    const hand = model.room.hands[model.uid];
     if (!hand[idx] || !hand[idx].tile) {
       return note(`can't play that, try again`);
     }
     let update = {};
     update["state"] = ROOM_STATES.WAITING_FOR_PLAYER(playerAfter(model.room.players, model.uid));
     if (isLegalPlay(model.room.play_pile, hand[idx].tile)) {
-      update["play_pile"] = model.room.play_pile!.concat(hand[idx].tile);
+      update["play_pile"] = model.room.play_pile.concat(hand[idx].tile);
       log(`${model.uid} played ${hand[idx].tile}`);
       if (hand[idx].tile[1] === "5") {
-        update["hints"] = model.room.hints! + 1;
+        update["hints"] = model.room.hints + 1;
       }
     } else {
-      update["errors"] = model.room.errors! + 1;
-      update["discard_pile"] = model.room.discard_pile!.concat(hand[idx].tile);
+      update["errors"] = model.room.errors + 1;
+      update["discard_pile"] = model.room.discard_pile.concat(hand[idx].tile);
       log(`${model.uid} tried to play ${hand[idx].tile}`);
     }
-    const next_tile = model.room.draw_pile![0];
+    const next_tile = model.room.draw_pile[0];
     if (next_tile) {
-      update["draw_pile"] = model.room.draw_pile!.slice(1);
+      update["draw_pile"] = model.room.draw_pile.slice(1);
       update[`hands.${model.uid}`] = removeCardFromHand(hand, idx).concat({
         tile: next_tile,
         hints: [],
@@ -442,8 +369,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     let update = {};
     update["state"] = ROOM_STATES.WAITING_FOR_PLAYER(playerAfter(model.room.players, model.uid));
-    update["hints"] = model.room.hints! - 1;
-    update[`hands.${target_player}`] = applyHintToHand(model.room.hands![target_player], h);
+    update["hints"] = model.room.hints - 1;
+    update[`hands.${target_player}`] = applyHintToHand(model.room.hands[target_player], h);
     remote.room.update(update);
     return log(`${model.uid} told ${target_player} about ${hint}`);
   }
