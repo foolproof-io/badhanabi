@@ -126,7 +126,7 @@ function viewModel(model, handler) {
       id: "players",
     }, [
       "Players:",
-      rotateToLast(model.room.players || [], model.uid).map(player => {
+      rotateToLast(model.room.players || model.room.viewers || [], model.uid).map(player => {
         const name = (model.room.names && model.room.names[player]) || player;
         if (!model.room.hands) {
           return m('p', name);
@@ -229,6 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
     room: {
       state: null,
       players: [],
+      viewers: [],
       names: {},
       hands: null,
       errors: null,
@@ -250,7 +251,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (evt && evt.uid) {
       model.uid = evt.uid;
       remote.room.set({
-        players: firebase.firestore.FieldValue.arrayUnion(model.uid),
+        viewers: firebase.firestore.FieldValue.arrayUnion(model.uid),
       }, {merge:true});
     }
   });
@@ -306,23 +307,25 @@ document.addEventListener('DOMContentLoaded', function() {
       return note(`game has already started`);
     }
 
-    const hand_size = handSize(model.room.players.length);
+    const players = model.room.viewers;
+    const hand_size = handSize(players.length);
     if (hand_size < 0) {
-      return note(`wrong number of players, we can support 2--5, you have ${model.room.players.length}`);
+      return note(`wrong number of players, we can support 2--5, you have ${players.length}`);
     }
     let deck = generateDeck();
     let hands = {};
-    model.room.players.forEach(player => {
+    players.forEach(player => {
       hands[player] = drawTiles(deck, hand_size);
     });
     remote.room.update({
+      players, 
       draw_pile: deck,
       discard_pile: [],
       play_pile: [],
       hints: NUM_INITIAL_HINTS,
       errors: 0,
       hands,
-      state: ROOM_STATES.WAITING_FOR_PLAYER(model.room.players[0]),
+      state: ROOM_STATES.WAITING_FOR_PLAYER(players[0]),
     });
     return log("game has begun!");
   }
