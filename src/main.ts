@@ -122,8 +122,8 @@ function viewModel(model, handler) {
     m("div", { id: "hints" }, `Hints: ${model.room.hints}`),
     m("div", { id: "errors" }, `Errors: ${model.room.errors}`),
     m("div", { id: "discards" }, [
-    "Discards:",
-     viewDiscardPile(model.room.discard_pile || []),
+      "Discards:",
+      viewDiscardPile(model.room.discard_pile || [])
     ]),
     m("div", { id: "plays" }, [
       "Plays:",
@@ -183,12 +183,14 @@ function viewModel(model, handler) {
   ]);
 }
 function viewDiscardPile(discard_pile: Tile[]): m.Child {
-  console.log("discard_pile = ", discard_pile);
-  return m("table", {}, COLORS.map(c => {
-    let discards_of_color: Tile[] = discard_pile.filter(t => matchesHint(t, c)).sort();
-    console.log(`discard_pile[${c}] = `, discards_of_color);
-    return m("tr", discards_of_color.map(t => m("td", viewDiscardedTile(t))))
-  }));
+  return m(
+    "table",
+    {},
+    COLORS.map(color => {
+      const tiles = discard_pile.filter(t => matchesHint(t, color)).sort();
+      return m("tr", tiles.map(t => m("td", viewDiscardedTile(t))));
+    })
+  );
 }
 function viewDiscardedTile(tile: Tile): m.Child {
   return m("img", {
