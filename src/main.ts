@@ -11,7 +11,6 @@ function strictParse(value: string): number {
     : NaN;
 }
 
-
 const COLORS = ['R', 'G', 'B', 'Y', 'W', 'P'];
 const RANKS = ['1', '2', '3', '4', '5'];
 const UNKNOWN = "UU";
