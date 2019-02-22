@@ -189,7 +189,10 @@ function viewTile(tile) {
   ]);
 }
 function viewHint(hint) {
-  return m('p', hint);
+  return m('img', {
+    class: "tile",
+    src: `./imgs/hints/${hint}.svg`
+  });
 }
 
 function rotateToLast(xs, x) {

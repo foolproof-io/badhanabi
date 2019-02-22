@@ -1,0 +1,5 @@
+<svg width="300" height="300" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg">
+<style> text { font: bold 80px monospace; } </style>
+<circle cx="150" cy="150" fill="#FFFFFF" r="80" stroke="#000000" stroke-width="5"/>
+<text x="150" y="150" text-anchor="middle" dominant-baseline="central">4</text>
+</svg>
