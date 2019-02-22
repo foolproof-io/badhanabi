@@ -508,8 +508,6 @@ document.addEventListener("DOMContentLoaded", function() {
     const v = evt.srcElement.value;
     if (evt.key === "Enter" && perform(v)) {
       evt.srcElement.value = "";
-    } else {
-      console.warn("invalid action: ", v);
     }
   }
   m.mount(document.body, model);
