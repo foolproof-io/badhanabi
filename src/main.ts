@@ -5,7 +5,12 @@ import 'firebase/auth';
 import 'firebase/firestore';
 
 
-console.log("typescript");
+function strictParse(value: string): number {
+  return /^(-|\+)?(\d+|Infinity)$/.test(value)
+    ? Number(value)
+    : NaN;
+}
+
 
 const COLORS = ['R', 'G', 'B', 'Y', 'W', 'P'];
 const RANKS = ['1', '2', '3', '4', '5'];
@@ -56,7 +61,7 @@ function summarizePlayPile(play_pile) {
   });
   play_pile.forEach(tile => {
     const c = tile[0];
-    const r = Number(tile[1]);
+    const r = strictParse(tile[1]);
     highest_by_color[c] = Math.max(highest_by_color[c], r);
   });
   return highest_by_color;
@@ -64,7 +69,7 @@ function summarizePlayPile(play_pile) {
 function isLegalPlay(play_pile, tile) {
   const summary = summarizePlayPile(play_pile);
   const c = tile[0];
-  const r = Number(tile[1]);
+  const r = strictParse(tile[1]);
   return r === summary[c] + 1;
 }
 function applyHintToHand(hand, hint) {
@@ -292,7 +297,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
       return note("not your turn");
     }
-    const idx = Number(idx_str);
+    const idx = strictParse(idx_str);
     const hand = model.room.hands[model.uid];
     if (!hand[idx] || !hand[idx].tile) {
       return note(`can't discard that, try again`);
@@ -315,7 +320,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
       return note("not your turn");
     }
-    const idx = Number(idx_str);
+    const idx = strictParse(idx_str);
     const hand = model.room.hands[model.uid];
     if (!hand[idx] || !hand[idx].tile) {
       return note(`can't play that, try again`);
