@@ -178,7 +178,9 @@ function viewModel(model, handler) {
       {
         id: "actions"
       },
-      model.actions.map(msg => m("p", msg.text))
+      model.actions.map(msg =>
+        m("p", viewAction(msg.text, model.room.names || {}))
+      )
     )
   ]);
 }
@@ -246,6 +248,15 @@ function viewMarker(hint: Hint): m.Child {
     class: "marker",
     src: `./imgs/hints/${hint}.svg`
   });
+}
+
+function viewAction(text: string, names: any): m.Child {
+  const sanitized: string = _.reduce(
+    names,
+    (acc: string, name: string, id: string) => acc.replace(id, name),
+    text
+  );
+  return m("p", {}, sanitized);
 }
 
 function rotateToLast(xs, x) {
@@ -353,7 +364,6 @@ document.addEventListener("DOMContentLoaded", function() {
     let update = {};
     update[`names.${model.uid}`] = name;
     remote.room.update(update);
-    return log(`${model.uid} set name to ${name}`);
   }
   function startGame() {
     if (model.room.state) {
