@@ -212,7 +212,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const room_id = window.location.pathname.substring(1);
   let model: any = {
     actions: [],
-    helptext: "try /help",
+    helptext: "try 'help' or '?'",
     room: {
       state: null,
       players: [],
@@ -271,12 +271,12 @@ document.addEventListener('DOMContentLoaded', function() {
       return note("waiting for room to load, this should happen automatically");
     }
     if (!model.room.state) {
-      return note("this game hasn't started yet, try /start");
+      return note("this game hasn't started yet, try 'start'");
     }
     if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
       return note("it's not your turn right now");
     }
-    return note("you can /discard <tile_idx>, /play <tile_idx>, or /hint <player> <hint>");
+    return note("you can 'discard <tile_idx>', 'play <tile_idx>', or 'hint <player> <hint>'");
   }
   function startGame() {
     if (model.room.state) {
@@ -390,11 +390,12 @@ document.addEventListener('DOMContentLoaded', function() {
     return log(`${model.uid} told ${target_player} about ${hint}`);
   }
   const commands = {
-    help: help,
-    start: startGame,
-    hint: giveHint,
-    discard: discardTile,
-    play: playTile,
+    "help": help,
+    "?": help,
+    "start": startGame,
+    "hint": giveHint,
+    "discard": discardTile,
+    "play": playTile,
   };
   function perform(action) {
     if (!model.uid) {
@@ -402,8 +403,8 @@ document.addEventListener('DOMContentLoaded', function() {
       return false;
     }
     for (let cmd in commands) {
-      if (action.startsWith(`/${cmd}`)) {
-        const args = action.substring(cmd.length + 1).trim().split(/\s+/);
+      if (action.startsWith(cmd)) {
+        const args = action.substring(cmd.length).trim().split(/\s+/);
         commands[cmd].apply(null, args);
         return true;
       }
