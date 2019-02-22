@@ -127,11 +127,12 @@ function viewModel(model, handler) {
     }, [
       "Players:",
       rotateToLast(model.room.players || [], model.uid).map(player => {
+        const name = (model.room.names && model.room.names[player]) || player;
         if (!model.room.hands) {
-          return m('p', player);
+          return m('p', name);
         }
         const hand = model.room.hands[player];
-        const player_view = viewPlayer(player, player === model.uid ? redactTiles(hand) : hand);
+        const player_view = viewPlayer(name, player === model.uid ? redactTiles(hand) : hand);
         return m('div', {
           class: model.room.state === ROOM_STATES.WAITING_FOR_PLAYER(player) ? "current_player" : "waiting_player",
         }, player_view);
@@ -228,6 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
     room: {
       state: null,
       players: [],
+      names: {},
       hands: null,
       errors: null,
       hints: null,
@@ -285,10 +287,19 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!model.room.state) {
       return note("this game hasn't started yet, try 'start'");
     }
-    if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
-      return note("it's not your turn right now");
-    }
     return note("you can 'discard <tile_idx>', 'play <tile_idx>', or 'hint <player> <hint>'");
+  }
+  function setName(name: string) {
+    if (!model.uid || !model.room) {
+      return note("loading...");
+    }
+    if (!/\w/.test(name)) {
+      return note(`invalid name: ${name}`);
+    }
+    let update = {};
+    update[`names.${model.uid}`] = name;
+    remote.room.update(update);
+    return log(`${model.uid} set name to ${name}`);
   }
   function startGame() {
     if (model.room.state) {
@@ -370,16 +381,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     remote.room.update(update);
   }
-  function giveHint(target_prefix, hint) {
+  function giveHint(target_prefix: string, hint) {
     if (model.room.state !== ROOM_STATES.WAITING_FOR_PLAYER(model.uid)) {
       return note("not your turn");
     }
     if (model.room.hints === 0) {
       return note("no hints left");
     }
-    const matching_players =
-      model.room.players.filter(p =>
-        p !== model.uid && p.toLowerCase().startsWith(target_prefix.toLowerCase()));
+    const matching_players: string[] =
+      _.flatMap(model.room.players, (player: string) => {
+        const name = (model.room.names && model.room.names[player]) || player;
+        return player !== model.uid && name.toLowerCase().startsWith(target_prefix.toLowerCase())
+          ? [ player ]
+          : [];
+      });
     if (matching_players.length === 0) {
       return note("prefix doesn't match any of the others players");
     }
@@ -404,6 +419,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const commands = {
     "help": help,
     "?": help,
+    "name": setName,
     "start": startGame,
     "hint": giveHint,
     "discard": discardTile,
