@@ -174,12 +174,13 @@ function viewModel(model, handler) {
     m("div", { id: "helptext" }, model.helptext),
 
     m(
-      "div",
+      "ol",
       {
-        id: "actions"
+        id: "actions",
+        reversed: true
       },
       model.actions.map(msg =>
-        m("p", viewAction(msg.text, model.room.names || {}))
+        m("li", viewAction(msg.text, model.room.names || {}))
       )
     )
   ]);
@@ -251,12 +252,11 @@ function viewMarker(hint: Hint): m.Child {
 }
 
 function viewAction(text: string, names: any): m.Child {
-  const sanitized: string = _.reduce(
+  return _.reduce(
     names,
     (acc: string, name: string, id: string) => acc.replace(id, name),
     text
   );
-  return m("p", {}, sanitized);
 }
 
 function rotateToLast(xs, x) {
