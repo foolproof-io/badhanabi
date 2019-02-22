@@ -380,7 +380,7 @@ document.addEventListener("DOMContentLoaded", function() {
     update["state"] = ROOM_STATES.WAITING_FOR_PLAYER(
       playerAfter(model.room.players, model.uid)
     );
-    update["hints"] = Math.max(model.room.hints + 1, NUM_INITIAL_HINTS);
+    update["hints"] = Math.min(model.room.hints + 1, NUM_INITIAL_HINTS);
     update["discard_pile"] = model.room.discard_pile.concat(hand[idx].tile);
     const next_tile = model.room.draw_pile[0];
     let next_hand = removeCardFromHand(hand, idx);
