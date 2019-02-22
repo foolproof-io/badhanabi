@@ -12,8 +12,8 @@ type Color = string;
 type Rank = string;
 type Tile = string;
 type Hint = string;
-const COLORS: Hint[] = ["R", "G", "B", "Y", "W", "P"];
-const RANKS: Color[] = ["1", "2", "3", "4", "5"];
+const COLORS: Color[] = ["R", "G", "B", "Y", "W", "P"];
+const RANKS: Rank[] = ["1", "2", "3", "4", "5"];
 const UNKNOWN: Tile = "UU";
 
 interface HandItem {
@@ -106,7 +106,7 @@ function removeCardFromHand(hand, idx) {
   return minus_card;
 }
 
-function matchesHint(tile, hint) {
+function matchesHint(tile: Tile, hint: Hint): boolean {
   return tile.indexOf(hint) !== -1;
 }
 
@@ -121,7 +121,10 @@ function viewModel(model, handler) {
     m("div", { id: "draws" }, `Draws: ${(model.room.draw_pile || []).length}`),
     m("div", { id: "hints" }, `Hints: ${model.room.hints}`),
     m("div", { id: "errors" }, `Errors: ${model.room.errors}`),
-    m("div", { id: "discards" }, `Discards: ${model.room.discard_pile || []}`),
+    m("div", { id: "discards" }, [
+    "Discards:",
+     viewDiscardPile(model.room.discard_pile || []),
+    ]),
     m("div", { id: "plays" }, [
       "Plays:",
       viewPlayPile(model.room.play_pile || [])
@@ -179,6 +182,20 @@ function viewModel(model, handler) {
     )
   ]);
 }
+function viewDiscardPile(discard_pile: Tile[]): m.Child {
+  console.log("discard_pile = ", discard_pile);
+  return m("table", {}, COLORS.map(c => {
+    let discards_of_color: Tile[] = discard_pile.filter(t => matchesHint(t, c)).sort();
+    console.log(`discard_pile[${c}] = `, discards_of_color);
+    return m("tr", discards_of_color.map(t => m("td", viewDiscardedTile(t))))
+  }));
+}
+function viewDiscardedTile(tile: Tile): m.Child {
+  return m("img", {
+    class: "discard",
+    src: `./imgs/tiles/${tile}.svg`
+  });
+}
 function viewPlayPile(play_pile) {
   const summary = summarizePlayPile(play_pile);
   return m("table", [
@@ -204,7 +221,7 @@ function viewPlayer(player_name, hand) {
 function viewHandItem(item) {
   return item.tile ? viewTile(item.tile) : viewMarker(item.hint);
 }
-function viewTile(tile) {
+function viewTile(tile: Tile): m.Child {
   return m("img", {
     class: "tile",
     src: `./imgs/tiles/${tile}.svg`
