@@ -170,24 +170,33 @@ function viewPlayer(player_name, hand) {
     m('table', [
       m('tr', hand.map((item, idx) => m('td', idx))),
       m('tr', hand.map(item => m('td', viewHandItem(item)))),
+      m('tr', hand.map(item => m('td', viewTileHints(item.hints)))),
     ]),
   ]);
 }
 function viewHandItem(item) {
   return item.tile
-    ? viewTile(item)
+    ? viewTile(item.tile)
     : viewMarker(item.hint);
 }
 function viewTile(tile) {
+  return m('img', {
+    class: "tile",
+    src: `./imgs/tiles/${tile}.svg`
+  });
+}
+function viewTileHints(hints: Hint[]): m.Child {
+  if (!hints) {
+    return "";
+  }
+  const color = _.find(hints, h => COLORS.indexOf(h) >= 0);
+  const rank = _.find(hints, h => RANKS.indexOf(h) >= 0);
   return m('div', [
-    m('img', {
-      class: "tile",
-      src: `./imgs/tiles/${tile.tile}.svg`
-    }),
-    m('br'),
-    `[${tile.hints}]`
+    m('img', { class: "hint", src: `./imgs/hints/${color || "U"}.svg` }),
+    m('img', { class: "hint", src: `./imgs/hints/${rank || "U"}.svg` }),
   ]);
 }
+
 function viewMarker(hint: Hint): m.Child {
   return m('img', {
     class: "marker",
