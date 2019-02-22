@@ -11,11 +11,24 @@ function strictParse(value: string): number {
     : NaN;
 }
 
-const COLORS = ['R', 'G', 'B', 'Y', 'W', 'P'];
-const RANKS = ['1', '2', '3', '4', '5'];
-const UNKNOWN = "UU";
-function generateDeck() {
-  let tiles = [];
+type Color = string;
+type Rank = string;
+type Tile = string;
+type Hint = string;
+const COLORS: Hint[] = ['R', 'G', 'B', 'Y', 'W', 'P'];
+const RANKS: Color[] = ['1', '2', '3', '4', '5'];
+const UNKNOWN: Tile = "UU";
+
+interface HandItem {
+  // If it is a tile
+  tile?: Tile;
+  hints?: Hint[];
+  // If it is a hint marker
+  hint?: Hint;
+}
+
+function generateDeck(): Tile[] {
+  let tiles: Tile[] = [];
   COLORS.forEach(c => {
     tiles.push(`${c}1`);
     tiles.push(`${c}1`);
@@ -40,8 +53,8 @@ function handSize(num_players) {
   }
 }
 const NUM_INITIAL_HINTS = 8;
-function drawTiles(tiles, num_tiles) {
-  let ts = [];
+function drawTiles(tiles: Tile[], num_tiles: number): HandItem[] {
+  let ts: HandItem[] = [];
   for (let i=0; i < num_tiles; i++) {
     ts.push({ tile: tiles.pop(), hints: [] });
   }
@@ -197,7 +210,7 @@ document.addEventListener('DOMContentLoaded', function() {
     projectId: "foolproof-hanabi",
   });
   const room_id = window.location.pathname.substring(1);
-  let model = {
+  let model: any = {
     actions: [],
     helptext: "try /help",
     room: {
@@ -220,22 +233,20 @@ document.addEventListener('DOMContentLoaded', function() {
     actions: app.firestore().collection("rooms").doc(room_id).collection("actions"),
   };
   app.auth().onAuthStateChanged(evt => {
-    model.uid = evt.uid;
-    if (model.uid) {
+    if (evt && evt.uid) {
+      model.uid = evt.uid;
       remote.room.set({
         players: firebase.firestore.FieldValue.arrayUnion(model.uid),
       }, {merge:true});
     }
   });
   remote.room.onSnapshot(snap => {
-    console.log("room: ", snap);
     if (snap.exists) {
       model.room = snap.data() as any;
       m.redraw();
     }
   });
   remote.actions.orderBy("time", "desc").onSnapshot(snap => {
-    console.log("actions: ", snap);
     model.actions = snap.docs.map(doc => doc.data());
     m.redraw();
   });
