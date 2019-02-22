@@ -176,7 +176,7 @@ function viewPlayer(player_name, hand) {
 function viewHandItem(item) {
   return item.tile
     ? viewTile(item)
-    : viewHint(item.hint);
+    : viewMarker(item.hint);
 }
 function viewTile(tile) {
   return m('div', [
@@ -188,9 +188,9 @@ function viewTile(tile) {
     `[${tile.hints}]`
   ]);
 }
-function viewHint(hint) {
+function viewMarker(hint: Hint): m.Child {
   return m('img', {
-    class: "tile",
+    class: "marker",
     src: `./imgs/hints/${hint}.svg`
   });
 }
