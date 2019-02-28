@@ -507,8 +507,11 @@ document.addEventListener("DOMContentLoaded", function() {
     name: setName,
     start: startGame,
     hint: giveHint,
+    h: giveHint,
     discard: discardTile,
-    play: playTile
+    d: discardTile,
+    play: playTile,
+    p: playTile
   };
   function perform(action) {
     if (!model.uid) {
