@@ -26,6 +26,10 @@ interface HandItem {
   hint?: Hint;
 }
 
+interface Controller {
+  onTextInput(evt: any): void;
+}
+
 function generateDeck(): Tile[] {
   let tiles: Tile[] = [];
   COLORS.forEach(c => {
@@ -42,7 +46,7 @@ function generateDeck(): Tile[] {
   });
   return _.shuffle(tiles);
 }
-function handSize(num_players) {
+function handSize(num_players: number): number {
   switch (num_players) {
     case 2:
       return 6;
@@ -117,7 +121,7 @@ const ROOM_STATES = {
   WAITING_TO_START: "waiting to start",
   WAITING_FOR_PLAYER: (player: PlayerId) => `waiting for ${player}`
 };
-function viewModel(model, handler) {
+function viewModel(model: any, handler: Controller): m.Child {
   return m("div", [
     m("div", { id: "whoami" }, `You are: ${model.uid}`),
     m("div", { id: "state" }, model.room.state || "waiting to start"),
@@ -169,7 +173,7 @@ function viewModel(model, handler) {
 
     m("input", {
       id: "user_input",
-      onkeypress: handler,
+      onkeypress: handler.onTextInput,
       placeholder: "user_input goes here",
       autofocus: true
     }),
@@ -293,8 +297,7 @@ document.addEventListener("DOMContentLoaded", function() {
       play_pile: null,
       draw_pile: null
     },
-    uid: null,
-    view: () => viewModel(model, handler)
+    uid: null
   };
 
   const app = firebase.app();
@@ -533,14 +536,17 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   app.auth().signInAnonymously();
-  function handler(evt) {
-    if (evt.type !== "keypress") {
-      console.warn("event wasn't a keypress, that's surprising");
+  const controller: Controller = {
+    onTextInput: evt => {
+      if (evt.type !== "keypress") {
+        console.warn("event wasn't a keypress, that's surprising");
+      }
+      const v = evt.srcElement.value;
+      if (evt.key === "Enter" && perform(v)) {
+        evt.srcElement.value = "";
+      }
     }
-    const v = evt.srcElement.value;
-    if (evt.key === "Enter" && perform(v)) {
-      evt.srcElement.value = "";
-    }
-  }
-  m.mount(document.body, model);
+  };
+
+  m.mount(document.body, { view: () => viewModel(model, controller) });
 });
