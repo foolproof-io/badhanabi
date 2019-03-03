@@ -3,10 +3,7 @@ import m from "mithril";
 import * as firebase from "firebase/app";
 import "firebase/auth";
 import "firebase/firestore";
-
-function strictParse(value: string): number {
-  return /^(-|\+)?(\d+|Infinity)$/.test(value) ? Number(value) : NaN;
-}
+import { strictParse } from "./util";
 
 type PlayerId = string;
 
