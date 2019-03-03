@@ -141,7 +141,7 @@ function viewPlayer(player_name: string, hand: Hand): m.Child {
     m("table", [
       m("tr", hand.map((item, idx) => m("td", idx))),
       m("tr", hand.map(item => m("td", viewHandItem(item)))),
-      m("tr", hand.map(item => m("td", viewTileHints(item.hints || []))))
+      m("tr", hand.map(item => m("td", viewTileHints(item.hints))))
     ])
   ]);
 }
@@ -154,7 +154,7 @@ function viewTile(tile: Tile): m.Child {
     src: `./imgs/tiles/${tile}.svg`
   });
 }
-function viewTileHints(hints: Hint[]): m.Child {
+function viewTileHints(hints?: Hint[]): m.Child {
   if (!hints) {
     return "";
   }
