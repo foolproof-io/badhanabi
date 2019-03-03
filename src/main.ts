@@ -1,4 +1,4 @@
-import * as _ from "lodash";
+import _ from "lodash";
 import m from "mithril";
 import firebase from "firebase/app";
 import "firebase/auth";
@@ -106,18 +106,19 @@ document.addEventListener("DOMContentLoaded", function() {
         );
     }
   }
-  function setName(name: string) {
+  function setName(name: string): boolean {
     if (!model.uid || !model.room) {
       return note("loading...");
     }
     if (!/\w/.test(name)) {
       return note(`invalid name: ${name}`);
     }
-    let update = {};
+    let update: any = {};
     update[`names.${model.uid}`] = name;
     remote.room.update(update);
+    return true;
   }
-  function startGame() {
+  function startGame(): boolean {
     if (!model.room) {
       return note(`waiting to load room`);
     }
@@ -135,10 +136,10 @@ document.addEventListener("DOMContentLoaded", function() {
       );
     }
     let deck = generateDeck();
-    let hands = {};
-    players.forEach(player => {
+    let hands: { [id: string]: Hand } = {};
+    for (let player of players) {
       hands[player] = drawTiles(deck, hand_size);
-    });
+    }
     remote.room.update({
       players,
       draw_pile: deck,
@@ -151,7 +152,7 @@ document.addEventListener("DOMContentLoaded", function() {
     });
     return log("game has begun!");
   }
-  function discardTile(idx_str) {
+  function discardTile(idx_str: string): boolean {
     if (!model.uid || !model.room || model.room.tag === "waiting_area") {
       return note(`game has not yet started...`);
     }
@@ -164,7 +165,7 @@ document.addEventListener("DOMContentLoaded", function() {
     if (!item || !item.tile) {
       return note(`can't discard that, try again`);
     }
-    let update = {};
+    let update: any = {};
     update["turn"] = itemAfter(model.uid, model.room.players);
     update["hints"] = Math.min(model.room.hints + 1, NUM_INITIAL_HINTS);
     update["discard_pile"] = model.room.discard_pile.concat(item.tile);
@@ -178,7 +179,7 @@ document.addEventListener("DOMContentLoaded", function() {
     remote.room.update(update);
     return log(`${model.uid} discarded ${hand[idx].tile}`);
   }
-  function playTile(idx_str) {
+  function playTile(idx_str: string): boolean {
     if (!model.uid || !model.room || model.room.tag === "waiting_area") {
       return note(`game has not yet started...`);
     }
@@ -191,7 +192,7 @@ document.addEventListener("DOMContentLoaded", function() {
     if (!item || !item.tile) {
       return note(`can't play that, try again`);
     }
-    let update = {};
+    let update: any = {};
     update["turn"] = itemAfter(model.uid, model.room.players);
     if (isLegalPlay(model.room.play_pile, item.tile)) {
       update["play_pile"] = model.room.play_pile.concat(item.tile);
@@ -213,8 +214,9 @@ document.addEventListener("DOMContentLoaded", function() {
       });
     }
     remote.room.update(update);
+    return true;
   }
-  function giveHint(target_prefix: string, hint: string) {
+  function giveHint(target_prefix: string, hint: string): boolean {
     if (!model.uid || !model.room || model.room.tag === "waiting_area") {
       return note(`game has not yet started...`);
     }
@@ -245,14 +247,14 @@ document.addEventListener("DOMContentLoaded", function() {
     if (game.players.indexOf(target_player) === -1) {
       return note("no such player");
     }
-    const h = hint.toUpperCase(); // canonicalize to uppercase
+    const h = hint.toUpperCase()[0]; // canonicalize to uppercase
     if (
       h.length !== 1 ||
       (COLORS.indexOf(h) === -1 && RANKS.indexOf(h) === -1)
     ) {
       return note("invalid hint");
     }
-    let update = {};
+    let update: any = {};
     update["turn"] = itemAfter(model.uid, game.players);
     update["hints"] = game.hints - 1;
     update[`hands.${target_player}`] = applyHintToHand(
@@ -262,25 +264,30 @@ document.addEventListener("DOMContentLoaded", function() {
     remote.room.update(update);
     return log(`${model.uid} told ${target_player} about ${hint}`);
   }
-  const commands = {
-    help: help,
-    "?": help,
-    name: setName,
-    start: startGame,
-    hint: giveHint,
-    discard: discardTile,
-    play: playTile
-  };
-  function perform(action) {
-    for (let cmd in commands) {
-      if (action.startsWith(cmd)) {
-        const args = action
-          .substring(cmd.length)
-          .trim()
-          .split(/\s+/);
-        commands[cmd].apply(null, args);
-        return true;
-      }
+  function perform(action: string): boolean {
+    let tokens = action.trim().split(/\s+/);
+    if (tokens.length === 0) {
+      return false;
+    }
+    const cmd = tokens[0];
+    const args = tokens.slice(1);
+    if (cmd === "?" || cmd === "help") {
+      return help();
+    }
+    if ("name".startsWith(cmd)) {
+      return args.length > 0 && setName(args.join(" "));
+    }
+    if ("start".startsWith(cmd)) {
+      return args.length === 0 && startGame();
+    }
+    if ("hint".startsWith(cmd)) {
+      return args.length === 2 && giveHint(args[0], args[1]);
+    }
+    if ("discard".startsWith(cmd)) {
+      return args.length === 1 && discardTile(args[0]);
+    }
+    if ("play".startsWith(cmd)) {
+      return args.length === 1 && playTile(args[0]);
     }
     return false;
   }

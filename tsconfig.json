@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "strictNullChecks": true,
+    "noImplicitAny": true,
     "esModuleInterop": true,
     "lib": [
       "dom",

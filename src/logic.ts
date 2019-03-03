@@ -1,6 +1,6 @@
-import * as _ from "lodash";
+import _ from "lodash";
 import { strictParse } from "./util";
-import { Tile, Hint, COLORS, Hand, Rank, RANKS } from "./model";
+import { Tile, Hint, COLORS, Hand, Color, Rank, RANKS } from "./model";
 
 export function generateDeck(): Tile[] {
   let tiles: Tile[] = [];
@@ -52,23 +52,20 @@ export function drawTiles(tiles: Tile[], num_tiles: number): Hand {
   return ts;
 }
 
-export function summarizePlayPile(play_pile: Tile[]): object {
-  let highest_by_color = {};
-  COLORS.forEach(c => {
-    highest_by_color[c] = 0;
-  });
-  play_pile.forEach(tile => {
+export function summarizePlayPile(play_pile: Tile[]): Map<Color, number> {
+  let highest_by_color = new Map<Color, number>();
+  for (let tile of play_pile) {
     const c = tile[0];
     const r = strictParse(tile[1]);
-    highest_by_color[c] = Math.max(highest_by_color[c], r);
-  });
+    highest_by_color.set(c, Math.max(highest_by_color.get(c) || 0, r));
+  }
   return highest_by_color;
 }
 export function isLegalPlay(play_pile: Tile[], tile: Tile): boolean {
   const summary = summarizePlayPile(play_pile);
   const c = tile[0];
   const r = strictParse(tile[1]);
-  return r === summary[c] + 1;
+  return r === (summary.get(c) || 0) + 1;
 }
 export function applyHintToHand(hand: Hand, hint: Hint): Hand {
   let applied = hand.map(item => {

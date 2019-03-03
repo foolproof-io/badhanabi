@@ -1,4 +1,4 @@
-import * as _ from "lodash";
+import _ from "lodash";
 import m from "mithril";
 import {
   Tile,
@@ -126,10 +126,10 @@ function viewDiscardedTile(tile: Tile): m.Child {
 function viewPlayPile(play_pile: Tile[]): m.Child {
   const summary = summarizePlayPile(play_pile);
   return m("table", [
-    m("tr", COLORS.map(c => m("td", viewPile(c, summary[c]))))
+    m("tr", COLORS.map(c => m("td", viewPile(c, summary.get(c) || 0))))
   ]);
 }
-function viewPile(color: Color, rank: Rank): m.Child {
+function viewPile(color: Color, rank: number): m.Child {
   return m("img", {
     class: "pile",
     src: `./imgs/piles/${color}${rank}.svg`
