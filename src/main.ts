@@ -1,6 +1,6 @@
 import * as _ from "lodash";
 import m from "mithril";
-import * as firebase from "firebase/app";
+import firebase from "firebase/app";
 import "firebase/auth";
 import "firebase/firestore";
 import { strictParse, itemAfter } from "./util";
