@@ -8,6 +8,8 @@ function strictParse(value: string): number {
   return /^(-|\+)?(\d+|Infinity)$/.test(value) ? Number(value) : NaN;
 }
 
+type PlayerId = string;
+
 type Color = string;
 type Rank = string;
 type Tile = string;
@@ -63,12 +65,12 @@ function drawTiles(tiles: Tile[], num_tiles: number): HandItem[] {
   return ts;
 }
 
-function playerAfter(players, p) {
+function playerAfter(players: PlayerId[], p: PlayerId): PlayerId {
   const idx = players.indexOf(p);
   return players[(idx + 1) % players.length];
 }
 
-function summarizePlayPile(play_pile) {
+function summarizePlayPile(play_pile: Tile[]): object {
   let highest_by_color = {};
   COLORS.forEach(c => {
     highest_by_color[c] = 0;
@@ -80,15 +82,15 @@ function summarizePlayPile(play_pile) {
   });
   return highest_by_color;
 }
-function isLegalPlay(play_pile, tile) {
+function isLegalPlay(play_pile: Tile[], tile: Tile): boolean {
   const summary = summarizePlayPile(play_pile);
   const c = tile[0];
   const r = strictParse(tile[1]);
   return r === summary[c] + 1;
 }
-function applyHintToHand(hand, hint) {
+function applyHintToHand(hand: HandItem[], hint: Hint): HandItem[] {
   let applied = hand.map(item => {
-    if (item.tile && matchesHint(item.tile, hint)) {
+    if (item.tile && item.hints && matchesHint(item.tile, hint)) {
       item.hints.push(hint);
     }
     return item;
@@ -97,7 +99,7 @@ function applyHintToHand(hand, hint) {
   return applied;
 }
 
-function removeCardFromHand(hand, idx) {
+function removeCardFromHand(hand: HandItem[], idx: number): HandItem[] {
   let minus_card = hand.slice(0, idx).concat(hand.slice(idx + 1));
   // trim off any leading hints, they give no information
   while (minus_card.length > 0 && minus_card[0].hint) {
@@ -110,9 +112,10 @@ function matchesHint(tile: Tile, hint: Hint): boolean {
   return tile.indexOf(hint) !== -1;
 }
 
+type GameState = string;
 const ROOM_STATES = {
   WAITING_TO_START: "waiting to start",
-  WAITING_FOR_PLAYER: player => `waiting for ${player}`
+  WAITING_FOR_PLAYER: (player: PlayerId) => `waiting for ${player}`
 };
 function viewModel(model, handler) {
   return m("div", [
@@ -201,30 +204,30 @@ function viewDiscardedTile(tile: Tile): m.Child {
     src: `./imgs/tiles/${tile}.svg`
   });
 }
-function viewPlayPile(play_pile) {
+function viewPlayPile(play_pile: Tile[]): m.Child {
   const summary = summarizePlayPile(play_pile);
   return m("table", [
     m("tr", COLORS.map(c => m("td", viewPile(c, summary[c]))))
   ]);
 }
-function viewPile(color, rank) {
+function viewPile(color: Color, rank: Rank): m.Child {
   return m("img", {
     class: "pile",
     src: `./imgs/piles/${color}${rank}.svg`
   });
 }
-function viewPlayer(player_name, hand) {
+function viewPlayer(player_name: string, hand: HandItem[]): m.Child {
   return m("div", [
     player_name,
     m("table", [
       m("tr", hand.map((item, idx) => m("td", idx))),
       m("tr", hand.map(item => m("td", viewHandItem(item)))),
-      m("tr", hand.map(item => m("td", viewTileHints(item.hints))))
+      m("tr", hand.map(item => m("td", viewTileHints(item.hints || []))))
     ])
   ]);
 }
-function viewHandItem(item) {
-  return item.tile ? viewTile(item.tile) : viewMarker(item.hint);
+function viewHandItem(item: HandItem): m.Child {
+  return item.tile ? viewTile(item.tile) : viewMarker(item.hint!);
 }
 function viewTile(tile: Tile): m.Child {
   return m("img", {
@@ -259,14 +262,14 @@ function viewAction(text: string, names: any): m.Child {
   );
 }
 
-function rotateToLast(xs, x) {
+function rotateToLast<T>(xs: T[], x: T): T[] {
   const idx = xs.indexOf(x);
   return idx === -1 ? xs : xs.slice(idx + 1).concat(xs.slice(0, idx + 1));
 }
-function redactTiles(hand) {
+function redactTiles(hand: HandItem[]): HandItem[] {
   return hand.map(item => (item.tile ? redactTile(item) : item));
 }
-function redactTile(item) {
+function redactTile(item: HandItem): HandItem {
   return { tile: UNKNOWN, hints: item.hints };
 }
 document.addEventListener("DOMContentLoaded", function() {
